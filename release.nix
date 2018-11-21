@@ -1,19 +1,26 @@
-{ supportedSystems ? ["i686-linux" "x86_64-linux"] }:
+
+{ fastcgiSrc ? { outPath = ../fastcgi; revCount = 0; gitTag = "dirty"; }
+, supportedSystems ? ["x86_64-linux"]
+}:
 
 with (import <nixpkgs/pkgs/top-level/release-lib.nix> { inherit supportedSystems; });
 
-{
+rec {
 
-  # Simply assign a derivation to an attribute to have it built.
-  hello_world_1 = pkgs_x86_64_linux.hello;
+  tarball = pkgs.releaseTools.sourceTarball {
+    name = "libfastcgi";
+    src = fastcgiSrc;
+    version = fastcgiSrc.gitTag;
+  };
 
-  # 'hydraJob' strips all non-essential attributes.
-  hello_world_2 = pkgs.lib.hydraJob pkgs_x86_64_linux.hello;
-
-  # Generate one attribute per supported platform.
-  hello_world_3 = pkgs.lib.genAttrs supportedSystems (system: (pkgsFor system).hello);
-
-} // mapTestOn {
-
-  # Fancy shortcut to generate one attribute per supported platform.
-  hello = supportedSystems;
+  build = pkgs.lib.genAttrs supportedSystems (system:
+    let
+      pkgs = pkgsFor system;
+    in
+      pkgs.releaseTools.nixBuild {
+        name = "libfastcgi";
+        src = tarball;
+        buildInputs = [ pkgs.boost.out ];
+      }
+  );
+}
